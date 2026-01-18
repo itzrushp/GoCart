@@ -1,5 +1,5 @@
 import imagekit from "@/configd/imageKit";
-import {prisma} from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 import authSeller from "@/middlewares/authSeller";
 import { getAuth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
@@ -7,9 +7,9 @@ import { NextResponse } from "next/server";
 export async function POST(request) {
   try {
     const { userId } = getAuth(request);
-    const store = await authSeller(userId);
+    const storeId = await authSeller(userId);
 
-    if (!store) {
+    if (!storeId) {
       return NextResponse.json({ error: "not authorized" }, { status: 401 });
     }
 
@@ -56,6 +56,7 @@ export async function POST(request) {
       })
     );
 
+
     await prisma.product.create({
       data: {
         name,
@@ -64,7 +65,11 @@ export async function POST(request) {
         price,
         category,
         images: imagesUrl,
-        storeId: store.id,
+        store: {
+          connect: {
+            id: storeId,
+          },
+        },
       },
     });
 
@@ -77,3 +82,30 @@ export async function POST(request) {
     );
   }
 }
+export async function GET(request) {
+  try {
+    const { userId } = getAuth(request);
+    const store = await authSeller(userId);
+
+    if (!store) {
+      return NextResponse.json(
+        { error: "not authorized" },
+        { status: 401 }
+      );
+    }
+
+    const products = await prisma.product.findMany({
+      where: { storeId: store.id },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return NextResponse.json({ products });
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json(
+      { error: error.message },
+      { status: 400 }
+    );
+  }
+}
+
